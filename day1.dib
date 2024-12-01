@@ -5,96 +5,88 @@
 #!fsharp
 
 #r "nuget: FSharpplus" 
+#r "nuget: FParsec"
+open FSharpPlus
+open FParsec
 
 #!fsharp
 
-let numbers = [|"0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"|]
-let numbersAndSpelledOut = [
-  "0";
-  "zero";
-  "1"; 
-  "one"
-  "2"; 
-  "two"
-  "3";
-  "three" 
-  "4"; 
-  "four"
-  "5"; 
-  "five"
-  "6"; 
-  "six"
-  "7";
-  "seven" 
-  "8"; 
-  "eight"
-  "9";
-  "nine"
-]
+// Extract the values from the text
 
-let reduceToElem predicate (a: (int option) seq) =
-  Seq.reduce (fun acc item -> 
-    match acc, item with
-    | Some a, Some x -> if (predicate a x) then Some x else Some a
-    | Some a, None -> Some a
-    | None, Some x -> Some x
-    | None, None -> None) a
+let numberPair: Parser<int32 * int32, unit> = tuple2 (pint32 .>> spaces) (spaces >>. pint32)
+let emptyLine: Parser<unit, unit> = spaces >>. skipNewline
+let skipEmptyLines: Parser<unit, unit> = many emptyLine >>% ()
+let linesParser: Parser<(int * int) list, unit> = many (skipEmptyLines >>. numberPair .>> optional skipNewline)
 
-let lowestIdx (number: string) (line: string): int option =
-  line.IndexOf(number, 0, StringComparison.InvariantCultureIgnoreCase)
-  |> fun idx -> if idx < 0 then None else Some idx
-
-let findFirstAndLast (numberPatterns: string seq) (line: String): char option * char option = 
-  let idxStart: int option = numberPatterns |> Seq.map (fun pattern -> lowestIdx pattern line) |> reduceToElem (fun a b -> if a > b then false else true)
-  let idxEnd: int option = numberPatterns |> Seq.map (fun pattern -> lowestIdx pattern line) |> reduceToElem (fun a b -> if a < b then false else true)
-
-  match (idxStart, idxEnd) with
-  | Some x, Some y -> Some line[x], Some line[y]
-  | Some x, None -> Some line[x], None
-  | None, Some y -> None, Some line[y]
-  | None, None -> None, None
+let extract runner = 
+  match (runner linesParser) with
+  | Success(value, _, _) -> value
+  | Failure(err, _, _) -> err |> exn |> raise
 
 #!fsharp
 
-let convertToVal (item: char option * char option): int =
-  printfn $"{item}"
-  match item with
-  | Some x, Some y -> Int32.Parse (x.ToString() + y.ToString())
-  | Some x, None -> Int32.Parse (x.ToString() + x.ToString())
-  | None, Some y -> Int32.Parse (y.ToString() + y.ToString())
-  | None, None -> 0
-  
-let sumAll (lineVal: (char option * char option) seq): int =
-  lineVal
-  |> Seq.fold (fun acc item -> acc + (convertToVal item)) 0
+// Calculate the answer
+
+let calcPart1 data = 
+  data  
+  |> List.unzip
+  |> fun (x, y) -> (List.sort x) |> List.zip (List.sort y)
+  |> Seq.fold (fun (acc: (int)) pair -> 
+      acc + abs((snd pair) - (fst pair))
+    ) 0
+
+let countOccurrences target list =
+    list
+    |> List.filter (fun x -> x = target)
+    |> List.length
+
+let calcPart2 data = 
+  data  
+  |> List.unzip
+  |> fun (x, y) -> x |> Seq.map (fun a -> (a, countOccurrences a y))
+  |> Seq.fold (fun acc pair -> 
+      acc + ((fst pair) * (snd pair))
+    ) 0
+
+
+let calculateAnswer runner calc = 
+  extract runner |> calc
 
 #!fsharp
 
-let inputExample = @"
-1abc2
-pqr3stu8vwx
-a1b2c3d4e5f
-treb7uchet
-"
-let inputPart2 = @"
-two1nine
-eightwothree
-abcone2threexyz
-xtwone3four
-4nineeightseven2
-zoneight234
-7pqrstsixteen
-"
+// Example data and string runner
+
+let inputExample = @"3   4
+4   3
+2   5
+1   3
+3   9
+3   3"
+
+let stringRunner s parser = runParserOnString parser () "" s
 
 #!fsharp
 
-let calcAnswer pattern (input: string) =
-  input.Split("\n") 
-  |> Seq.map (findFirstAndLast pattern)
-  |> sumAll
+// Example proof #1
+let exampleExpected = 11
+let exampleActual = calculateAnswer (stringRunner inputExample) calcPart1
+printfn "Example #1: expexted: %d, actual: %d" exampleExpected exampleActual
 
-let exampleAnswer = calcAnswer numbers inputExample
+#!fsharp
 
-let part2Answer = calcAnswer numbersAndSpelledOut inputPart2
+// Example proof #2
+let exampleExpected = 31
+let exampleActual = calculateAnswer (stringRunner inputExample) calcPart2
+printfn "Example #2: expexted: %d, actual: %d" exampleExpected exampleActual
 
-(exampleAnswer, part2Answer)
+#!fsharp
+
+// Calculate the exercises
+
+let fileRunner filename parser = runParserOnFile parser () filename Encoding.ASCII
+
+let part1Actual: int = calculateAnswer (fileRunner "data/input1a.txt") calcPart1
+printfn "Part 1: %d" part1Actual
+
+let part2Actual: int = calculateAnswer (fileRunner "data/input1b.txt") calcPart2
+printfn "Part 2: %d" part2Actual
