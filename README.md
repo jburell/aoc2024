@@ -7,3 +7,6 @@
 
 ## Run
 Open the desired notebook (*.dib file) and click "Run all" to run all steps.
+
+You should see something like this
+![image](https://github.com/user-attachments/assets/2dd51272-82f4-4ca4-9923-5866b967c1e6)
