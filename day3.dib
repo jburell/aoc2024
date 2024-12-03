@@ -1,0 +1,52 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"aliases":[],"name":"csharp"}]}}
+
+#!fsharp
+
+#r "nuget: FSharpplus" 
+#r "nuget: FParsec"
+open FSharpPlus
+open FParsec
+
+#!fsharp
+
+// Extract the data
+
+let mulParser: Parser<int * int, unit> =
+    pstring "mul" >>. 
+    between (pchar '(') (pchar ')') (pint32 .>> pchar ',' .>>. pint32)
+
+let skipUntilTarget = notFollowedBy mulParser >>. anyChar
+let skipUnwantedParser = skipMany skipUntilTarget
+
+let fullParser: Parser<(int * int) list, unit> =
+    many (skipUnwantedParser >>. mulParser .>> skipUnwantedParser)
+
+let extract runner = 
+  match (runner fullParser) with
+  | Success(value, _, _) -> value
+  | Failure(err, _, _) -> err |> exn |> raise
+
+#!fsharp
+
+let calculate vals = 
+  vals
+  |> List.map (fun (a, b) -> a * b) 
+  |> List.sum
+
+let calculateAnswer runner calc = 
+  extract runner |> calc
+
+#!fsharp
+
+let inputExample = @"xmul(2,4)%&mul[3,7]!@^do_not_mul(5,5)+mul(32,64]then(mul(11,8)mul(8,5))"
+let exampleExpectedPart1 = 161
+
+let stringRunner s parser = runParserOnString parser () "" s
+let exampleActualPart1 = calculateAnswer (stringRunner inputExample) calculate
+printfn $"Example part1: expected: {exampleExpectedPart1}, actual: {exampleActualPart1}"
+
+#!fsharp
+
+// Part 1
