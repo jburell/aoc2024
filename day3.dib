@@ -13,15 +13,28 @@ open FParsec
 
 // Extract the data
 
-let mulParser: Parser<int * int, unit> =
-    pstring "mul" >>. 
-    between (pchar '(') (pchar ')') (pint32 .>> pchar ',' .>>. pint32)
+type Operation = Mul of (int * int) | Activated of bool
+
+let mulParser: Parser<Operation, unit> =
+  pstring "mul" >>. 
+  between (pchar '(') (pchar ')') (pint32 .>> pchar ',' .>>. pint32) 
+    |>> (fun (a, b) -> Mul (a, b))
+
+let doParser: Parser<Operation, unit> =
+  pstring "do()" |>> fun _ -> Activated true
+
+let dontParser: Parser<Operation, unit> =
+  pstring "don't()" |>> fun _ -> Activated false
 
 let skipUntilTarget = notFollowedBy mulParser >>. anyChar
 let skipUnwantedParser = skipMany skipUntilTarget
 
-let fullParser: Parser<(int * int) list, unit> =
-    many (skipUnwantedParser >>. mulParser .>> skipUnwantedParser)
+let parseOperation: Parser<Operation list, unit> =
+  many (choice [mulParser; doParser; dontParser])
+
+
+let fullParser: Parser<Operation list, unit> =
+  many (skipUnwantedParser >>. parseOperation .>> skipUnwantedParser)
 
 let extract runner = 
   match (runner fullParser) with
@@ -30,23 +43,53 @@ let extract runner =
 
 #!fsharp
 
+// Calculations
+
 let calculate vals = 
+  printfn "%A" vals
   vals
-  |> List.map (fun (a, b) -> a * b) 
-  |> List.sum
+  |> List.fold (fun acc (op: Operation) ->
+    let active, sum = acc
+    match op with
+    | Mul (a, b) -> 
+      if active
+      then (active, sum + a * b)
+      else (active, sum)
+    | Activated b -> (b, sum)) (true, 0)
+  |> snd
 
 let calculateAnswer runner calc = 
   extract runner |> calc
 
 #!fsharp
 
-let inputExample = @"xmul(2,4)%&mul[3,7]!@^do_not_mul(5,5)+mul(32,64]then(mul(11,8)mul(8,5))"
+// Runners
+let stringRunner s parser = runParserOnString parser () "" s
+let fileRunner filename parser = runParserOnFile parser () filename Encoding.ASCII
+
+#!fsharp
+
+// Example 1
+
+let inputExample1 = @"xmul(2,4)%&mul[3,7]!@^do_not_mul(5,5)+mul(32,64]then(mul(11,8)mul(8,5))"
 let exampleExpectedPart1 = 161
 
-let stringRunner s parser = runParserOnString parser () "" s
-let exampleActualPart1 = calculateAnswer (stringRunner inputExample) calculate
+let exampleActualPart1 = calculateAnswer (stringRunner inputExample1) calculate
 printfn $"Example part1: expected: {exampleExpectedPart1}, actual: {exampleActualPart1}"
 
 #!fsharp
 
 // Part 1
+
+let part1Actual: int = calculateAnswer (fileRunner "data/input3a.txt") calculate
+printfn "Part 1: %d" part1Actual
+
+#!fsharp
+
+// Example 2
+
+let inputExample2 = "xmul(2,4)&mul[3,7]!^don't()_mul(5,5)+mul(32,64](mul(11,8)undo()?mul(8,5))"
+let exampleExpectedPart2 = 48
+
+let exampleActualPart2 = calculateAnswer (stringRunner inputExample2) calculate
+printfn $"Example part1: expected: {exampleExpectedPart2}, actual: {exampleActualPart2}"
