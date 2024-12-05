@@ -26,12 +26,11 @@ let doParser: Parser<Operation, unit> =
 let dontParser: Parser<Operation, unit> =
   pstring "don't()" |>> fun _ -> Activated false
 
-let skipUntilTarget = notFollowedBy mulParser >>. anyChar
+let skipUntilTarget = notFollowedBy parseOperation >>. anyChar
 let skipUnwantedParser = skipMany skipUntilTarget
 
-let parseOperation: Parser<Operation list, unit> =
-  many (choice [mulParser; doParser; dontParser])
-
+let parseOperation: Parser<Operation, unit> =
+  (choice [mulParser; doParser; dontParser])
 
 let fullParser: Parser<Operation list, unit> =
   many (skipUnwantedParser >>. parseOperation .>> skipUnwantedParser)
@@ -46,7 +45,6 @@ let extract runner =
 // Calculations
 
 let calculate vals = 
-  printfn "%A" vals
   vals
   |> List.fold (fun acc (op: Operation) ->
     let active, sum = acc
@@ -57,6 +55,13 @@ let calculate vals =
       else (active, sum)
     | Activated b -> (b, sum)) (true, 0)
   |> snd
+
+let calculate_and_skip_activations vals = 
+  vals
+  |> List.fold (fun acc (op: Operation) ->
+    match op with
+    | Mul (a, b) -> acc + a * b
+    | Activated b -> acc) 0
 
 let calculateAnswer runner calc = 
   extract runner |> calc
@@ -74,14 +79,14 @@ let fileRunner filename parser = runParserOnFile parser () filename Encoding.ASC
 let inputExample1 = @"xmul(2,4)%&mul[3,7]!@^do_not_mul(5,5)+mul(32,64]then(mul(11,8)mul(8,5))"
 let exampleExpectedPart1 = 161
 
-let exampleActualPart1 = calculateAnswer (stringRunner inputExample1) calculate
+let exampleActualPart1 = calculateAnswer (stringRunner inputExample1) calculate_and_skip_activations
 printfn $"Example part1: expected: {exampleExpectedPart1}, actual: {exampleActualPart1}"
 
 #!fsharp
 
 // Part 1
 
-let part1Actual: int = calculateAnswer (fileRunner "data/input3a.txt") calculate
+let part1Actual: int = calculateAnswer (fileRunner "data/input3a.txt") calculate_and_skip_activations
 printfn "Part 1: %d" part1Actual
 
 #!fsharp
@@ -93,3 +98,10 @@ let exampleExpectedPart2 = 48
 
 let exampleActualPart2 = calculateAnswer (stringRunner inputExample2) calculate
 printfn $"Example part1: expected: {exampleExpectedPart2}, actual: {exampleActualPart2}"
+
+#!fsharp
+
+// Part 2
+
+let part2Actual: int = calculateAnswer (fileRunner "data/input3b.txt") calculate
+printfn "Part 2: %d" part2Actual

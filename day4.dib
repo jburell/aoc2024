@@ -1,0 +1,92 @@
+#!meta
+
+{"kernelInfo":{"defaultKernelName":"csharp","items":[{"aliases":[],"name":"csharp"}]}}
+
+#!fsharp
+
+#r "nuget: FSharpplus" 
+#r "nuget: FParsec"
+open FSharpPlus
+open FParsec
+
+#!fsharp
+
+// Extract the values from the text
+
+let lineParser: Parser<char list, unit> = many letter
+let fullParser: Parser<char list list, unit> = sepEndBy lineParser newline
+
+let extract runner = 
+  match (runner fullParser) with
+  | Success(value, _, _) -> value |> fun v -> printfn "%A" v; v
+  | Failure(err, _, _) -> err |> exn |> raise
+
+let calculateAnswer runner calc = 
+  extract runner |> calc
+
+#!fsharp
+
+// Calculate
+
+let rec searchInDir (dir: int * int) (x: int) (y: int) (step: int) (xmas: string): string =
+  match step with
+  | 0 -> failwith "pang"
+  // TODO: Continue here
+
+let searchForXmas (x: int) (y: int) (mat: char list list): string list =
+  let applySearch dir =
+    searchInDir dir x y 0 ""
+  // We search in 9 different directions
+  [
+    applySearch (-1, -1); // up, left
+    applySearch (0, -1);  // up
+    applySearch (1, 1);   // up, right
+    applySearch (1, 0);   // right
+    applySearch (1, 1);   // down, right
+    applySearch (0, 1);   // down
+    applySearch (-1, 1);  // down, left
+    applySearch (-1, 0)   // left
+  ]
+  
+
+let calcPart1 (mat: char list list) =
+  mat
+  |> List.indexed
+  |> List.iter (fun (idx_y, lst) ->
+    lst 
+    |> List.indexed
+    |> List.iter (fun (idx_x, c) -> 
+      if c = 'X'
+      then printfn "%A" (searchForXmas idx_x idx_y mat) //printfn $"x:{idx_x} y:{idx_y}: {c}"// Start looking for XMAS
+    )
+  )
+
+#!fsharp
+
+// Runners
+
+let stringRunner s parser = runParserOnString parser () "" s
+let fileRunner filename parser = runParserOnFile parser () filename Encoding.ASCII
+
+#!fsharp
+
+// Example proof #1
+let inputExample = @"MMMSXXMASM
+MSAMXMSMSA
+AMXSXMAAMM
+MSAMASMSMX
+XMASAMXAMM
+XXAMMXXAMA
+SMSMSASXSS
+SAXAMASAAA
+MAMMMXMMMM
+MXMXAXMASX"
+let exampleExpected = 18
+let exampleActual = calculateAnswer (stringRunner inputExample) calcPart1
+
+#!fsharp
+
+// Part 1
+
+//let part1Actual: int = calculateAnswer (fileRunner "data/input1a.txt") calcPart1
+//printfn "Part 1: %d" part1Actual
