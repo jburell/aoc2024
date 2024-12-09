@@ -18,7 +18,7 @@ let fullParser: Parser<char list list, unit> = sepEndBy lineParser newline
 
 let extract runner = 
   match (runner fullParser) with
-  | Success(value, _, _) -> value |> fun v -> printfn "%A" v; v
+  | Success(value, _, _) -> value //|> fun v -> printfn "%A" v; v
   | Failure(err, _, _) -> err |> exn |> raise
 
 let calculateAnswer runner calc = 
@@ -28,38 +28,48 @@ let calculateAnswer runner calc =
 
 // Calculate
 
-let rec searchInDir (dir: int * int) (x: int) (y: int) (step: int) (xmas: string): string =
-  match step with
-  | 0 -> failwith "pang"
-  // TODO: Continue here
+let searchForXmas (x: int) (y: int) (mat: char list list): int =
+  let rec searchInDir (x: int) (y: int) (step: int) (mat: char list list) (dir: int * int): bool =
+    match x + (fst dir), y + (snd dir) with
+      | nx, ny when 
+        nx >= 0 
+        && nx < mat[y].Length 
+        && ny >= 0 
+        && ny < mat.Length -> 
+          match step, mat[ny][nx] with
+          | 1, 'M' -> searchInDir nx ny (step + 1) mat dir
+          | 2, 'A' -> searchInDir nx ny (step + 1) mat dir
+          | 3, 'S' -> true
+          | _ -> false
+      | _ -> false
 
-let searchForXmas (x: int) (y: int) (mat: char list list): string list =
-  let applySearch dir =
-    searchInDir dir x y 0 ""
-  // We search in 9 different directions
-  [
-    applySearch (-1, -1); // up, left
-    applySearch (0, -1);  // up
-    applySearch (1, 1);   // up, right
-    applySearch (1, 0);   // right
-    applySearch (1, 1);   // down, right
-    applySearch (0, 1);   // down
-    applySearch (-1, 1);  // down, left
-    applySearch (-1, 0)   // left
-  ]
+  // We search in 8 different directions
+  [ (-1, -1)    // up, left
+    ; (0, -1)   // up
+    ; (1, -1)   // up, right
+    ; (1, 0)    // right
+    ; (1, 1)    // down, right
+    ; (0, 1)    // down
+    ; (-1, 1)   // down, left
+    ; (-1, 0) ] // left
+  |> List.fold (fun (acc: int) (dir: int * int) -> 
+    if searchInDir x y 1 mat dir
+    then acc + 1
+    else acc) 0
   
 
-let calcPart1 (mat: char list list) =
+let calcPart1 (mat: char list list): int =
   mat
   |> List.indexed
-  |> List.iter (fun (idx_y, lst) ->
-    lst 
+  |> List.fold (fun (acc: int) (idx_y, lst) ->
+    acc + (lst 
     |> List.indexed
-    |> List.iter (fun (idx_x, c) -> 
-      if c = 'X'
-      then printfn "%A" (searchForXmas idx_x idx_y mat) //printfn $"x:{idx_x} y:{idx_y}: {c}"// Start looking for XMAS
+    |> List.fold (fun (acc: int) (idx_x, c) -> 
+      if mat[idx_y][idx_x] = 'X'
+      then acc + searchForXmas idx_x idx_y mat
+      else acc) 0
     )
-  )
+  ) 0 
 
 #!fsharp
 
@@ -83,10 +93,11 @@ MAMMMXMMMM
 MXMXAXMASX"
 let exampleExpected = 18
 let exampleActual = calculateAnswer (stringRunner inputExample) calcPart1
+(exampleExpected, exampleActual)
 
 #!fsharp
 
 // Part 1
 
-//let part1Actual: int = calculateAnswer (fileRunner "data/input1a.txt") calcPart1
-//printfn "Part 1: %d" part1Actual
+let part1Actual: int = calculateAnswer (fileRunner "data/input4a.txt") calcPart1
+printfn "Part 1: %d" part1Actual
